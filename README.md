@@ -6,7 +6,7 @@ When all else fails, why not a brute-force search! Brutax is a JAX library for f
 
 - Highly-parallel function evaluations
 - PyTree-valued grids
-- Support for custom search behavior downstream
+- Customizable search behavior downstream
 - Smooth integration with JAX function transformations: JIT, autodiff, vectorization, and scaling across GPU/TPUs
 
 ## Installation

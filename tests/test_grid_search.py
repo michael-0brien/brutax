@@ -95,7 +95,7 @@ def test_run_grid_search(batch_size, dim, offset, variance):
     # Run the grid search
     method = brutax.MinimumSearchMethod(batch_size=batch_size)
     solution = brutax.run_grid_search(cost_fn, method, grid, (variance, offset))
-    np.testing.assert_allclose(solution.state.current_minimum_eval, true_min_eval)
+    np.testing.assert_allclose(solution.state.minimum_eval, true_min_eval)
     np.testing.assert_allclose(solution.value, true_min_pos)
 
 

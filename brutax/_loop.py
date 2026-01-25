@@ -36,21 +36,15 @@ def run_grid_search(
 
     !!! question "What is a `tree_grid`?"
 
-        This is the grid of inputs to `fn` to search over, which is
+        This is the grid of inputs to `fn` to search over. It is
         represented as an arbitrary
-        pytree whose leaves are JAX arrays with a leading dimension.
+        pytree, whose leaves are JAX arrays with a leading dimension.
         For a particular leaf, its leading dimension indexes a set
         grid points. The entire grid is then the cartesian product
         of the grid points of all of its leaves.
 
-    !!! warning
-
-        A `tree_grid` can only have leaves that are JAX arrays of
-        grid points and `None`. It is difficult to precisely check this
-        condition even with a run-time type checker, so breaking it may
-        result in unhelpful errors. From an arbitrary `pytree`, this can
-        easily be created as
-        `tree_grid = equinox.partition(pytree, eqx.is_array)`.
+        From an arbitrary tree structure, create a `tree_grid`
+        as `tree_grid, _ = equinox.partition(pytree, eqx.is_array)`.
 
     To learn more, see the `tree_grid` manipulation routines
     [`brutax.tree_grid_shape`][] and [`brutax.tree_grid_take`][].
