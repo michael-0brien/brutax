@@ -1,12 +1,11 @@
-
+import brutax as btx
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import pytest
 import numpy as np
+import pytest
 from jax import Array
 
-import brutax as btx
 
 class ExamplePyTree(eqx.Module):
     a_1: Array
@@ -100,16 +99,12 @@ def test_run_grid_search(batch_size, dim, offset, variance):
     np.testing.assert_allclose(solution.value, true_min_pos)
 
 
-def _make_coordinates(
-    shape: tuple[int, int]
-) -> Array:
+def _make_coordinates(shape: tuple[int, int]) -> Array:
     make_1d = lambda size, dx: jnp.fft.fftshift(jnp.fft.fftfreq(size, 1 / dx)) * size
     ndim = len(shape)
     coords1D = []
     for idx in range(ndim):
-        c1D = make_1d(
-            shape[idx], 1.0
-        )
+        c1D = make_1d(shape[idx], 1.0)
         coords1D.append(c1D)
     y, x = coords1D
     xv, yv = jnp.meshgrid(x, y, indexing="xy")

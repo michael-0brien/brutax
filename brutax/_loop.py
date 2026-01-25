@@ -12,13 +12,13 @@ import jax.tree_util as jtu
 from jaxtyping import Array, PyTree
 
 from ._internal import fori_loop_tqdm_decorator
-from ._types import PyTreeGrid, PyTreeGridPoint
+from ._method import AbstractGridSearchMethod
 from ._tree_grid import (
     tree_grid_shape,
     tree_grid_take,
     tree_grid_unravel_index,
 )
-from ._method import AbstractGridSearchMethod
+from ._types import PyTreeGrid, PyTreeGridPoint
 
 
 @eqx.filter_jit

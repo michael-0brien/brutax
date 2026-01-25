@@ -11,12 +11,12 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jaxtyping import Array, Int, PyTree
 
-from ._types import PyTreeGrid, PyTreeGridPoint, SearchSolution, SearchState
 from ._tree_grid import (
     tree_grid_shape,
     tree_grid_take,
     tree_grid_unravel_index,
 )
+from ._types import PyTreeGrid, PyTreeGridPoint, SearchSolution, SearchState
 
 
 class AbstractGridSearchMethod(
