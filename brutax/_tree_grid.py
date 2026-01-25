@@ -18,9 +18,11 @@ def tree_grid_shape(
 
     **Arguments:**
 
-    - `tree_grid`: A sparse grid cartesian grid, represented as a pytree.
-                   See [`run_grid_search`][] for more information.
-    - `is_leaf`: As [`jax.tree_util.tree_flatten`](https://jax.readthedocs.io/en/latest/_autosummary/jax.tree_util.tree_flatten.html).
+    - `tree_grid`:
+        A pytree of arrays (or `None`) that represents the search
+        grid. See [`brutax.run_grid_search`][] for more information.
+    - `is_leaf`:
+        As [`jax.tree_util.tree_flatten`](https://jax.readthedocs.io/en/latest/_autosummary/jax.tree_util.tree_flatten.html).
 
     **Returns:**
 
@@ -81,36 +83,33 @@ def tree_grid_unravel_index(
     *,
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> PyTreeGridIndex:
-    """Get a "grid index" for a pytree grid.
+    """Get the "index" for a given grid point on a `tree_grid`.
 
-    Roughly, this can be thought of as `jax.numpy.unravel_index`, but with a
-    pytree grid. See [`tree_grid_take`][] for an example of how to use this
-    function to sample a grid point.
+    This can be thought of as `jax.numpy.unravel_index`, but with a
+    `tree_grid`. See [`brutax.tree_grid_take`][] for an example of
+    how to use this function to sample a grid point.
 
     **Arguments:**
 
-    - `raveled_index`: A flattened index for `tree_grid`. Simply pass an integer
-                       valued index, as one would with a flattened array. Passing
-                       a 1D array of indices is also supported.
-    - `tree_grid`: A sparse grid cartesian grid, represented as a pytree.
-                   See [`run_grid_search`][] for more information.
-    - `is_leaf`: As [`jax.tree_util.tree_flatten`](https://jax.readthedocs.io/en/latest/_autosummary/jax.tree_util.tree_flatten.html).
+    - `raveled_index`:
+        A flattened index for `tree_grid`. Simply pass an integer
+        valued index, as one would with a flattened array. Passing
+        a 1D array of indices is also supported.
+    - `tree_grid`:
+        A pytree of arrays (or `None`) that represents the search
+        grid. See [`brutax.run_grid_search`][] for more information.
+    - `is_leaf`:
+        As [`jax.tree_util.tree_flatten`](https://jax.readthedocs.io/en/latest/_autosummary/jax.tree_util.tree_flatten.html).
 
     **Returns:**
 
-    The grid index. This is a pytree of the same structure as `tree_grid`, with the
+    A pytree of the same structure as `tree_grid`, with the
     result of `jax.numpy.unravel_index(raveled_index, shape)` inserted into the
-    appropriate leaf. Here, `shape` is given by the output of [`tree_grid_shape`][].
+    appropriate leaf. The value of `shape` is given by the output of
+    [`brutax.tree_grid_shape`][].
     """
     raveled_index = jnp.asarray(raveled_index)
     shape = tree_grid_shape(tree_grid, is_leaf=is_leaf)
-    # raveled_index = eqx.error_if(
-    #     raveled_index,
-    #     jnp.logical_or(raveled_index < 0, raveled_index >= math.prod(shape)),
-    #     "The flattened grid index must be greater than 0 and less than the "
-    #     f"grid size. Got index {raveled_index}, but the grid has shape {shape}, "
-    #     f"so its maximum index is {math.prod(shape) - 1}.",
-    # )
     unraveled_index = jnp.unravel_index(raveled_index, shape)
     tree_grid_def = jtu.tree_structure(tree_grid, is_leaf=is_leaf)
     tree_grid_index = jtu.tree_unflatten(tree_grid_def, unraveled_index)
@@ -123,7 +122,7 @@ def tree_grid_take(
     tree_grid_index: PyTreeGridIndex,
 ) -> PyTreeGridPoint:
     """Get a grid point of the pytree grid, given a
-    pytree grid index. See [`tree_grid_unravel_index`][] to see
+    pytree grid index. See [`brutax.tree_grid_unravel_index`][] to see
     how to return a pytree grid index.
 
     Roughly, this can be thought of as `jax.numpy.take`, but with a
@@ -131,14 +130,16 @@ def tree_grid_take(
 
     **Arguments:**
 
-    - `tree_grid`: A sparse cartesian grid, represented as a pytree.
-                   See [`run_grid_search`][] for more information.
-    - `tree_grid_index`: An index for `tree_grid`, also represented as a pytree.
-                   See [`tree_grid_unravel_index`][] for more information.
+    - `tree_grid`:
+        A pytree of arrays (or `None`) that represents the search
+        grid. See [`brutax.run_grid_search`][] for more information.
+    - `tree_grid_index`:
+        An index for `tree_grid`, also represented as a pytree.
+        See [`brutax.tree_grid_unravel_index`][] for more information.
 
     **Returns:**
 
-    A grid point of a pytree grid. This is a pytree of the same
+    A grid point of the `tree_grid`. This is a pytree of the same
     structure as `tree_grid` (or a prefix of it), where each leaf
     is indexed by the leaf at `tree_grid_index`.
 

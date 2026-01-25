@@ -32,11 +32,12 @@ def run_grid_search(
     progress_bar: bool = False,
     total_updates: int = 20,
 ) -> PyTree[Any]:
-    """Run a grid search to minimize the function `fn`.
+    """Run a grid search over the function `fn`.
 
     !!! question "What is a `tree_grid`?"
 
-        For the grid search, we represent the grid as an arbitrary
+        This is the grid of inputs to `fn` to search over, which is
+        represented as an arbitrary
         pytree whose leaves are JAX arrays with a leading dimension.
         For a particular leaf, its leading dimension indexes a set
         grid points. The entire grid is then the cartesian product
@@ -47,33 +48,45 @@ def run_grid_search(
         A `tree_grid` can only have leaves that are JAX arrays of
         grid points and `None`. It is difficult to precisely check this
         condition even with a run-time type checker, so breaking it may
-        result in unhelpful errors.
+        result in unhelpful errors. From an arbitrary `pytree`, this can
+        easily be created as
+        `tree_grid = equinox.partition(pytree, eqx.is_array)`.
 
-    To learn more, see the `tree_grid` manipulation routines [`tree_grid_shape`][] and
-    [`tree_grid_take`][].
+    To learn more, see the `tree_grid` manipulation routines
+    [`brutax.tree_grid_shape`][] and [`brutax.tree_grid_take`][].
 
     **Arguments:**
 
-    - `fn`: The function we would like to minimize with grid search. This
-            should be evaluated at arguments `fn(y, args)`, where `y` is a
-            particular grid point of `tree_grid`. The value returned by `fn`
-            must be compatible with the respective `method`.
-    - `method`: An interface that specifies what we would like to do with
-                each evaluation of `fn`.
-    - `tree_grid`: The grid as a pytree. Importantly, its leaves can only be JAX
-                   arrays with leading dimensions and `None`.
-    - `args`: Arguments passed to `fn`, as `fn(y, args)`.
-    - `is_leaf`: As [`jax.tree_util.tree_flatten`](https://jax.readthedocs.io/en/latest/_autosummary/jax.tree_util.tree_flatten.html).
-                 This specifies what is to be treated as a leaf in `tree_grid`.
-    - `progress_bar`: Add a [`tqdm`](https://github.com/tqdm/tqdm) progress bar to the
-                      search loop.
+    - `fn`:
+        The function to search over. This must have signature `fn(y, args)`,
+        where `y` is a particular grid point of `tree_grid`. The value
+        returned by `fn` must be compatible with the respective `method`.
+    - `method`:
+        An interface that specifies what we would like to do with
+        each evaluation of `fn`. For example, [`brutax.MinimumSearchMethod`][].
+    - `tree_grid`:
+        The grid as an arbitrary pytree. Its leaves can only be JAX
+        arrays, each with a leading dimension, and `None`.
+    - `args`:
+        Arguments passed to `fn`, i.e. `fn(y, args)`.
+    - `is_leaf`:
+        As [`jax.tree_util.tree_flatten`](https://jax.readthedocs.io/en/latest/_autosummary/jax.tree_util.tree_flatten.html).
+        This specifies what is to be treated as a leaf in `tree_grid`. This is
+        useful for wrapping multiple JAX arrays into the same grid point.
+    - `progress_bar`:
+        Add a [`tqdm`](https://github.com/tqdm/tqdm) progress bar to the
+        search loop.
     - `total_updates`:
-        An interval for the number of iterations at which toupdate the
-        tqdm progress bar. By default, this is `20`. Ignored if `progress_bar = False`.
+        The number of updates of the progress bar over the course of the search.
+        By default, `20`. Ignored if `progress_bar = False`.
 
     **Returns:**
 
-    Any pytree, as specified by the method `AbstractGridSearchMethod.postprocess`.
+    The solution of the search. In general, this is the output of
+    [`brutax.AbstractGridSearchMethod.postprocess`][]. For the case
+    of [`brutax.MinimumSearchMethod`][], access the solution of the
+    search as `sol = brutax.run_grid_search(...); sol.value`.
+    ```
     """
     # Evaluate the shape and dtype of the output of `fn` using
     # eqx.filter_closure_convert.
@@ -142,12 +155,7 @@ def run_grid_search(
                 "number of iterations. Try decreasing `total_updates` "
                 "or setting it to `None`."
             )
-        try:
-            body_fun = fori_loop_tqdm_decorator(n_iterations, print_every)(body_fun)
-        except ModuleNotFoundError as err:
-            raise ModuleNotFoundError(
-                "Could not use `progress_bar = True` because `tqdm` was not installed."
-            ) from err
+        body_fun = fori_loop_tqdm_decorator(n_iterations, print_every)(body_fun)
     final_carry = jax.lax.fori_loop(0, n_iterations, body_fun, init_carry)
     if method.batch_size is not None and grid_size % method.batch_size != 0:
         final_carry = jax.lax.fori_loop(

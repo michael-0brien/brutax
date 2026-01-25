@@ -1,9 +1,21 @@
 from collections.abc import Callable
+from typing import TypeVar
 
 import jax
 from jax.debug import callback
+from tqdm.auto import tqdm as pbar
 
 
+#
+# Generic types
+#
+SearchSolution = TypeVar("SearchSolution")
+SearchState = TypeVar("SearchState")
+
+
+#
+# `tqdm` progress bar
+#
 def fori_loop_tqdm_decorator(
     n_iterations: int,
     print_every: int | None = None,
@@ -30,8 +42,6 @@ def fori_loop_tqdm_decorator(
 def _build_tqdm(
     n: int, print_rate: int | None = None, **kwargs
 ) -> tuple[Callable, Callable]:
-    from tqdm.auto import tqdm as pbar
-
     desc = kwargs.pop("desc", f"Running for {n:,} iterations")
     message = kwargs.pop("message", desc)
     for kwarg in ("total", "mininterval", "maxinterval", "miniters"):

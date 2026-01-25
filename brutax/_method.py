@@ -1,6 +1,5 @@
 """An interface for a grid search method."""
 
-import math
 from abc import abstractmethod
 from collections.abc import Callable
 from typing import Any, Generic
@@ -11,12 +10,13 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jaxtyping import Array, Int, PyTree
 
+from ._internal import SearchSolution, SearchState
 from ._tree_grid import (
     tree_grid_shape,
     tree_grid_take,
     tree_grid_unravel_index,
 )
-from ._types import PyTreeGrid, PyTreeGridPoint, SearchSolution, SearchState
+from ._types import PyTreeGrid, PyTreeGridPoint
 
 
 class AbstractGridSearchMethod(
@@ -36,19 +36,7 @@ class AbstractGridSearchMethod(
         *,
         is_leaf: Callable[[Any], bool] | None = None,
     ) -> SearchState:
-        """Initialize the state of the search method.
-
-        **Arguments:**
-
-        - `tree_grid`: As [`run_grid_search`][].
-        - `f_struct`: A container that stores the `shape` and `dtype`
-                      returned by `fn`.
-        - `is_leaf`: As [`run_grid_search`][].
-
-        **Returns:**
-
-        Any pytree that represents the state of the grid search.
-        """
+        """Initialize the state of the search method."""
         raise NotImplementedError
 
     @abstractmethod
@@ -58,25 +46,9 @@ class AbstractGridSearchMethod(
         tree_grid_point: PyTreeGridPoint,
         args: Any,
         state: SearchState,
-        raveled_grid_index: Int[Array, ""],
+        raveled_index: Int[Array, ""],
     ) -> SearchState:
-        """Update the state of the grid search.
-
-        **Arguments:**
-
-        - `fn`: As [`run_grid_search`][].
-        - `tree_grid_point`: The grid point at which to evaluate `fn`. Specifically,
-                             `fn` is evaluated as `fn(tree_grid_point, args)`.
-        - `args`: As [`run_grid_search`][].
-        - `state`: The current state of the search.
-        - `raveled_grid_index`: The current index of the grid. This is
-                                used to index `tree_grid` to extract the
-                                `tree_grid_point`.
-
-        **Returns:**
-
-        The updated state of the grid search.
-        """
+        """Update the state of the grid search."""
         raise NotImplementedError
 
     @abstractmethod
@@ -86,24 +58,28 @@ class AbstractGridSearchMethod(
         tree_grid_point_batch: PyTreeGridPoint,
         args: Any,
         state: SearchState,
-        raveled_grid_index_batch: Int[Array, " _"],
+        raveled_index_batch: Int[Array, " _"],
     ) -> SearchState:
-        """Update the state of the grid search with a batch of grid points as
-        input.
+        """Update the state of the grid search with a batch of
+        grid points as input.
 
-        **Arguments:**
+        !!! info
+            When implementing a custom `AbstractGridSearchMethod`,
+            if it is not desired to implement a `batch_update` you
+            can simply return a `NotImplementedError`. For example
 
-        - `fn`: As [`run_grid_search`][].
-        - `tree_grid_point_batch`: The grid points at which to evaluate `fn` in
-                                   parallel.
-        - `args`: As [`run_grid_search`][].
-        - `state`: The current state of the search.
-        - `raveled_grid_index_batch`: The current batch of indices on which to evaluate
-                                      the grid.
+            ```python
+            import brutax
 
-        **Returns:**
+            class CustomSearchMethod(brutax.AbstractGridSearchMethod):
 
-        The updated state of the grid search.
+                batch_size: None = None
+
+                ...
+
+                def batch_update(...):
+                    raise NotImplementedError()
+            ```
         """
         raise NotImplementedError
 
@@ -118,18 +94,6 @@ class AbstractGridSearchMethod(
     ) -> SearchSolution:
         """Post-process the final state of the grid search into a
         solution.
-
-        **Arguments:**
-
-        - `tree_grid`: As [`run_grid_search`][].
-        - `final_state`: The final state of the grid search.
-        - `f_struct`: A container that stores the `shape` and `dtype`
-                      returned by `fn`.
-        - `is_leaf`: As [`run_grid_search`][].
-
-        **Returns:**
-
-        Any pytree that represents the solution of the grid search.
         """
         raise NotImplementedError
 
@@ -142,46 +106,51 @@ class _MinimumState(eqx.Module, strict=True):
 
 class _MinimumSolution(eqx.Module, strict=True):
     value: PyTreeGridPoint | None
-    stats: dict[str, Any]
+    grid_shape: tuple[int, ...]
     state: _MinimumState
 
 
 class MinimumSearchMethod(
     AbstractGridSearchMethod[_MinimumState, _MinimumSolution], strict=True
 ):
-    """Simply find the minimum value returned by `fn` over all grid points.
+    """Find the minimum value returned by `fn` over all grid points.
 
-    The minimization is done *elementwise* for the output returned by `fn(y, args)`.
-    This allows for more clever grid searches than a brute-force approach--for example,
-    `fn` can explore its own region of parameter space in parallel.
+    The minimization is done *elementwise* for the output returned by
+    `fn(y, args)`, allowing exploration of different regions of parameter
+    space in parallel.
     """
 
-    stores_solution_value: bool
-    stores_current_eval: bool
+    store_solution_value: bool
+    store_current_eval: bool
     batch_size: int | None
 
     def __init__(
         self,
         *,
-        stores_solution_value: bool = True,
-        stores_current_eval: bool = False,
+        store_solution_value: bool = True,
+        store_current_eval: bool = False,
         batch_size: int | None = None,
     ):
         """**Arguments:**
 
-        - `stores_solution_value`: If `True`, the grid search solution will contain the
-                                best grid point found. If `False`, only the flattened
-                                index corresponding to these grid points are returned
-                                and [`tree_grid_take`][] must be used to extract the
-                                actual grid points. Setting this to `False` may be
-                                necessary if the grid contains large arrays.
-        - `stores_current_eval`: If `True`, carry over the last function evaluation in
-                                the `_MinimumState`. This is useful when wrapping this
-                                class into new `AbstractGridSearchMethod`s.
-        - `batch_size`: The stride of grid points over which to evaluate in parallel.
+        - `store_solution_value`:
+            If `True`, the grid search solution will contain the
+            best grid point found. If `False`, only the flattened
+            index corresponding to these grid points are returned
+            and [`tree_grid_take`][] must be used to extract the
+            actual grid points. Setting this to `False` may be
+            necessary if the grid contains large arrays.
+        - `store_current_eval`:
+            If `True`, carry over the last function evaluation in
+            the `state`. This can be used to wrapping this class into
+            another [`brutax.AbstractGridSearchMethod`][] with slightly different
+            behavior.
+        - `batch_size`:
+            The number of grid points over which to vectorize over with
+            `jax.vmap`.
         """
-        self.stores_solution_value = stores_solution_value
-        self.stores_current_eval = stores_current_eval
+        self.store_solution_value = store_solution_value
+        self.store_current_eval = store_current_eval
         self.batch_size = batch_size
 
     def init(
@@ -191,6 +160,20 @@ class MinimumSearchMethod(
         *,
         is_leaf: Callable[[Any], bool] | None = None,
     ) -> _MinimumState:
+        """Initialize the state of the `MinimumSearchMethod`.
+
+        **Arguments:**
+
+        - `tree_grid`: As [`brutax.run_grid_search`][].
+        - `f_struct`: A container that stores the `shape` and `dtype`
+                      returned by `fn`.
+        - `is_leaf`: As [`brutax.run_grid_search`][].
+
+        **Returns:**
+
+        The initial state of the search.
+        """
+        del tree_grid, is_leaf
         # Initialize the state, just keeping track of the best function values
         # and their respective grid index
         return _MinimumState(
@@ -202,7 +185,7 @@ class MinimumSearchMethod(
                     if self.batch_size is None
                     else jnp.full((self.batch_size, *f_struct.shape), 0.0, dtype=float)
                 )
-                if self.stores_current_eval
+                if self.store_current_eval
                 else None
             ),
         )
@@ -213,8 +196,29 @@ class MinimumSearchMethod(
         tree_grid_point: PyTreeGridPoint,
         args: Any,
         state: _MinimumState,
-        raveled_grid_index: Int[Array, ""],
+        raveled_index: Int[Array, ""],
     ) -> _MinimumState:
+        """Update the state of the grid search.
+
+        **Arguments:**
+
+        - `fn`:
+            As [`brutax.run_grid_search`][].
+        - `tree_grid_point`:
+            The grid point at which to evaluate `fn`. Specifically,
+            `fn` is evaluated as `fn(tree_grid_point, args)`.
+        - `args`:
+            As [`brutax.run_grid_search`][].
+        - `state`:
+            The current state of the search.
+        - `raveled_index`:
+            The current index of the grid. This is
+            used to index `tree_grid` to extract the
+            `tree_grid_point`.
+
+        **Returns:**
+
+        The updated state of the grid search."""
         # Evaluate the function
         value = fn(tree_grid_point, args)
         # Unpack the current state
@@ -226,12 +230,12 @@ class MinimumSearchMethod(
             is_less_than_last_minimum, value, last_minimum_value
         )
         current_best_raveled_index = jnp.where(
-            is_less_than_last_minimum, raveled_grid_index, last_best_raveled_index
+            is_less_than_last_minimum, raveled_index, last_best_raveled_index
         )
         return _MinimumState(
             current_minimum_eval,
             current_best_raveled_index,
-            current_eval=value if self.stores_current_eval else None,
+            current_eval=value if self.store_current_eval else None,
         )
 
     def batch_update(
@@ -240,12 +244,33 @@ class MinimumSearchMethod(
         tree_grid_point_batch: PyTreeGridPoint,
         args: Any,
         state: _MinimumState,
-        raveled_grid_index_batch: Int[Array, " _"],
+        raveled_index_batch: Int[Array, " _"],
     ) -> _MinimumState:
+        """Update the state of the grid search with a batch of
+        grid points as input.
+
+        **Arguments:**
+
+        - `fn`:
+            As [`brutax.run_grid_search`][].
+        - `tree_grid_point_batch`:
+            The grid points over which to evaluate `fn` with `jax.vmap`.
+        - `args`:
+            As [`brutax.run_grid_search`][].
+        - `state`:
+            The current state of the search.
+        - `raveled_index_batch`:
+            The batch of indices on which to evaluate
+            the grid.
+
+        **Returns:**
+
+        The updated state of the grid search.
+        """
         # Evaluate the batch of grid points and extract the best one
         value_batch = jax.vmap(fn, in_axes=[0, None])(tree_grid_point_batch, args)
         best_batch_index = jnp.argmin(value_batch, axis=0)
-        raveled_grid_index = jnp.take(raveled_grid_index_batch, best_batch_index)
+        raveled_index = jnp.take(raveled_index_batch, best_batch_index)
         value = jnp.amin(value_batch, axis=0)
         # Unpack the current state
         last_minimum_value = state.current_minimum_eval
@@ -256,12 +281,12 @@ class MinimumSearchMethod(
             is_less_than_last_minimum, value, last_minimum_value
         )
         current_best_raveled_index = jnp.where(
-            is_less_than_last_minimum, raveled_grid_index, last_best_raveled_index
+            is_less_than_last_minimum, raveled_index, last_best_raveled_index
         )
         return _MinimumState(
             current_minimum_eval,
             current_best_raveled_index,
-            current_eval=value_batch if self.stores_current_eval else None,
+            current_eval=value_batch if self.store_current_eval else None,
         )
 
     def postprocess(
@@ -272,6 +297,24 @@ class MinimumSearchMethod(
         *,
         is_leaf: Callable[[Any], bool] | None = None,
     ) -> _MinimumSolution:
+        """Postprocess the final state of the grid search and return the
+        solution.
+
+        **Arguments:**
+
+        - `tree_grid`:
+            As [`brutax.run_grid_search`][].
+        - `final_state`:
+            The final state of the grid search.
+        - `f_struct`:
+            The `shape` and `dtype` returned by `fn`.
+        - `is_leaf`:
+            As [`brutax.run_grid_search`][].
+
+        **Returns:**
+
+        The solution of the grid search.
+        """
         # Make sure that shapes did not get modified during loop
         if final_state.current_best_raveled_index.shape != f_struct.shape:
             raise ValueError(
@@ -281,7 +324,7 @@ class MinimumSearchMethod(
                 f"shape {final_state.current_best_raveled_index.shape} for the "
                 "solution."
             )
-        if self.stores_solution_value:
+        if self.store_solution_value:
             # Extract the solution of the search, i.e. the grid point(s) corresponding
             # to the raveled grid index
             if f_struct.shape == ():
@@ -305,6 +348,6 @@ class MinimumSearchMethod(
         # ... build and return the solution
         return _MinimumSolution(
             value,
-            {"grid_size": math.prod(tree_grid_shape(tree_grid, is_leaf=is_leaf))},
+            tree_grid_shape(tree_grid, is_leaf=is_leaf),
             final_state,
         )

@@ -1,4 +1,4 @@
-import brutax as btx
+import brutax
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -29,13 +29,13 @@ def test_pytree_grid_manipulation():
     is_leaf = lambda x: isinstance(x, ExamplePyTree)
     tree_grid = [ExamplePyTree(a_1, a_2, a_3), b, None, (c, (None,))]
     # Get grid point
-    shape = btx.tree_grid_shape(tree_grid, is_leaf=is_leaf)
-    tree_grid_point = btx.tree_grid_take(
-        tree_grid, btx.tree_grid_unravel_index(0, tree_grid, is_leaf=is_leaf)
+    shape = brutax.tree_grid_shape(tree_grid, is_leaf=is_leaf)
+    tree_grid_point = brutax.tree_grid_take(
+        tree_grid, brutax.tree_grid_unravel_index(0, tree_grid, is_leaf=is_leaf)
     )
-    tree_grid_points = btx.tree_grid_take(
+    tree_grid_points = brutax.tree_grid_take(
         tree_grid,
-        btx.tree_grid_unravel_index(jnp.asarray([0, 10]), tree_grid, is_leaf=is_leaf),
+        brutax.tree_grid_unravel_index(jnp.asarray([0, 10]), tree_grid, is_leaf=is_leaf),
     )
     # Define ground truth
     true_shape = (a_1.size, b.size, c.size)
@@ -93,8 +93,8 @@ def test_run_grid_search(batch_size, dim, offset, variance):
     )
     grid = (x, y)
     # Run the grid search
-    method = btx.MinimumSearchMethod(batch_size=batch_size)
-    solution = btx.run_grid_search(cost_fn, method, grid, (variance, offset))
+    method = brutax.MinimumSearchMethod(batch_size=batch_size)
+    solution = brutax.run_grid_search(cost_fn, method, grid, (variance, offset))
     np.testing.assert_allclose(solution.state.current_minimum_eval, true_min_eval)
     np.testing.assert_allclose(solution.value, true_min_pos)
 
