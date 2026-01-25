@@ -1,0 +1,26 @@
+changelog:
+  exclude:
+    authors:
+      - dependabot
+      - pre-commit-ci
+  categories:
+    - title: "Bug Fixes"
+      labels:
+        - bug
+    - title: "Features"
+      labels:
+        - feature
+        - enhancement
+    - title: "Performance improvements"
+      labels:
+        - efficiency
+    - title: "Maintenance"
+      labels:
+        - refactor
+        - cleanup
+        - unit tests
+        - error handling
+        - type checking
+    - title: "Other Changes"
+      labels:
+        - misc
