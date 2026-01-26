@@ -4,9 +4,15 @@ changelog:
       - dependabot
       - pre-commit-ci
   categories:
+    - title: "Breaking changes"
+      labels:
+        - breaking-change
     - title: "Bug Fixes"
       labels:
         - bug
+    - title: "API updates"
+      labels:
+        - api-update
     - title: "Features"
       labels:
         - feature
