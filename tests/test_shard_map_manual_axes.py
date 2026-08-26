@@ -59,10 +59,13 @@ def test_run_grid_search_hangs_or_errors_without_the_fix_disabled():
     underlying jax behavior has changed, and the workaround in
     `MinimumSearchMethod.init`/`run_grid_search` should be re-evaluated.
     """
+    # Positional, not axis_sizes=/axis_shapes= keywords: jax renamed this
+    # kwarg between adjacent minor versions (0.10 used axis_shapes, 0.11 uses
+    # axis_sizes) -- positional args are stable across both.
     mesh = jax.make_mesh(
-        axis_sizes=(N_DEVICES,),
-        axis_names=("batch_dim",),
-        axis_types=(jshard.AxisType.Explicit,),
+        (N_DEVICES,),
+        ("batch_dim",),
+        (jshard.AxisType.Explicit,),
     )
     images = jax.device_put(
         jnp.ones((N_DEVICES, 5)),
@@ -115,10 +118,13 @@ def test_run_grid_search_under_shard_map_matches_unsharded_reference():
         for images in images_per_device
     ]
 
+    # Positional, not axis_sizes=/axis_shapes= keywords: jax renamed this
+    # kwarg between adjacent minor versions (0.10 used axis_shapes, 0.11 uses
+    # axis_sizes) -- positional args are stable across both.
     mesh = jax.make_mesh(
-        axis_sizes=(N_DEVICES,),
-        axis_names=("batch_dim",),
-        axis_types=(jshard.AxisType.Explicit,),
+        (N_DEVICES,),
+        ("batch_dim",),
+        (jshard.AxisType.Explicit,),
     )
     images_sharded = jax.device_put(
         jnp.stack(images_per_device),
