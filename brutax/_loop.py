@@ -87,12 +87,16 @@ def run_grid_search(
         tree_grid_unravel_index(0, tree_grid, is_leaf=is_leaf),
     )
     fn = eqx.filter_closure_convert(fn, test_tree_grid_point, args)
-    # Get `fn`'s output shape/dtype with a fresh `jax.eval_shape` call rather
-    # than reusing `fn.out_struct`: under `jax.shard_map`, `fn.out_struct`
-    # does not preserve which manual mesh axes the output varies over, but a
-    # fresh call does. `MinimumSearchMethod.init` relies on `f_struct`
-    # carrying this correctly.
-    f_struct = jax.eval_shape(fn, test_tree_grid_point, args)
+    # `f_struct` needs a real call to `fn`, not `fn.out_struct`: under
+    # `jax.shard_map`, `fn.out_struct` loses which manual mesh axes the
+    # output varies over, and `MinimumSearchMethod.init` needs that to seed
+    # its state with a matching type. `eqx.filter_eval_shape`, not raw
+    # `jax.eval_shape`, is required here -- `fn`'s args can hold plain
+    # non-array fields (e.g. a `tuple[int, int]` shape) that must stay
+    # static, and raw `eval_shape` abstractifies its whole input pytree,
+    # turning those into tracers and breaking `fn`'s own closure-conversion
+    # check.
+    f_struct = eqx.filter_eval_shape(fn, test_tree_grid_point, args)
     # Get the initial state of the search method
     init_state = method.init(tree_grid, f_struct, is_leaf=is_leaf)
     dynamic_init_state, static_state = eqx.partition(init_state, eqx.is_array)
