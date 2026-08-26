@@ -3,7 +3,7 @@ name = "brutax"
 description = "Function minimization by brute force grid search in JAX"
 authors = [{ name = "Michael O'Brien", email = "michaelobrien@g.harvard.edu" }]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = {file = "LICENSE"}
 keywords = ["jax", "equinox", "grid-search", "optimization"]
 classifiers = [
