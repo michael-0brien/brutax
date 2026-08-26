@@ -175,15 +175,24 @@ class MinimumSearchMethod(
         """
         del tree_grid, is_leaf
         # Initialize the state, just keeping track of the best function values
-        # and their respective grid index
+        # and their respective grid index. Built via `full_like`/`zeros_like`
+        # against `f_struct` itself, not `f_struct.shape`, so each array keeps
+        # any extra type information `f_struct` carries -- e.g. under
+        # `jax.shard_map`, which manual mesh axes a value varies over. This
+        # state and the state `update()` produces later together form a
+        # `jax.lax.fori_loop` carry, which requires the same type at every
+        # iteration.
         return _MinimumState(
-            minimum_eval=jnp.full(f_struct.shape, jnp.inf, dtype=float),
-            best_raveled_index=jnp.full(f_struct.shape, 0, dtype=int),
+            minimum_eval=jnp.full_like(f_struct, jnp.inf, dtype=float),
+            best_raveled_index=jnp.zeros_like(f_struct, dtype=int),
             current_eval=(
                 (
-                    jnp.full(f_struct.shape, 0.0, dtype=float)
+                    jnp.zeros_like(f_struct, dtype=float)
                     if self.batch_size is None
-                    else jnp.full((self.batch_size, *f_struct.shape), 0.0, dtype=float)
+                    else jnp.broadcast_to(
+                        jnp.zeros_like(f_struct, dtype=float),
+                        (self.batch_size, *f_struct.shape),
+                    )
                 )
                 if self.store_current_eval
                 else None

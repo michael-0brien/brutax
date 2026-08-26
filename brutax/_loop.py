@@ -5,10 +5,8 @@ from collections.abc import Callable
 from typing import Any
 
 import equinox as eqx
-import equinox.internal as eqxi
 import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 from jaxtyping import Array, PyTree
 
 from ._internal import fori_loop_tqdm_decorator
@@ -82,18 +80,19 @@ def run_grid_search(
     search as `sol = brutax.run_grid_search(...); sol.value`.
     ```
     """
-    # Evaluate the shape and dtype of the output of `fn` using
-    # eqx.filter_closure_convert.
+    # Closure-convert `fn` so any array it closes over (rather than
+    # receiving via `args`) is tracked explicitly.
     test_tree_grid_point = tree_grid_take(
         tree_grid,
         tree_grid_unravel_index(0, tree_grid, is_leaf=is_leaf),
     )
     fn = eqx.filter_closure_convert(fn, test_tree_grid_point, args)
-    f_struct = jtu.tree_map(
-        lambda x: x.value,
-        jtu.tree_map(eqxi.Static, fn.out_struct),  # type: ignore
-        is_leaf=lambda x: isinstance(x, eqxi.Static),
-    )
+    # Get `fn`'s output shape/dtype with a fresh `jax.eval_shape` call rather
+    # than reusing `fn.out_struct`: under `jax.shard_map`, `fn.out_struct`
+    # does not preserve which manual mesh axes the output varies over, but a
+    # fresh call does. `MinimumSearchMethod.init` relies on `f_struct`
+    # carrying this correctly.
+    f_struct = jax.eval_shape(fn, test_tree_grid_point, args)
     # Get the initial state of the search method
     init_state = method.init(tree_grid, f_struct, is_leaf=is_leaf)
     dynamic_init_state, static_state = eqx.partition(init_state, eqx.is_array)
